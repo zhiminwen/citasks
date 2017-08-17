@@ -5,11 +5,11 @@ This gem bootstraps the initial setup for gitlab and jenkins integration.
 ## Install and require 
 Install 
 ```
-gem install citools
+gem install citasks
 ```
 Use
 ```
-require 'citools'
+require 'citasks'
 ```
 
 ## Usage
