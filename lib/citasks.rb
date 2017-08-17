@@ -1,5 +1,5 @@
-require_relative "ci/ci_lib"
-require_relative "ci/task_index"
+require_relative "citasks/ci_lib"
+require_relative "citasks/task_index"
 
 namespace "Jenkins" do
   @task_index = 0
