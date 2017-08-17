@@ -19,7 +19,6 @@ In your rake task file. Note the order is after the loading of the env
 ```
 require 'dotenv'
 Dotenv.load
-
 require 'citasks'
 ```
 
@@ -32,7 +31,6 @@ GITLAB_PASS=
 GITLAB_BASE_URL=
 GITLAB_IN_CLUSTER_BASE_URL=
 GITLAB_API_TOKEN=
-
 
 JOB_NAME=
 JENKINS_URL=
@@ -56,4 +54,8 @@ rake Gitlab:02_webhook              # setup webhook
 rake Gitlab:03_delete               # delete icp-demo-app
 rake Jenkins:01_create_new_project  # create a new project icp-demo-app
 rake Jenkins:02_delete              # delete icp-demo-app
+rake git:01_commit[msg]             # add and commit
+rake git:02_set_remote_orgin        # set remote origin to http://localhost...
+rake git:03_set_remote_url          # reset remote url http://localhost:312...
+rake git:04_push                    # push
 ```

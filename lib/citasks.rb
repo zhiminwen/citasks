@@ -9,14 +9,22 @@ namespace "Jenkins" do
     sprintf("%s/%s/%s.git",ENV["GITLAB_IN_CLUSTER_BASE_URL"], ENV["GITLAB_USER"], ENV["REPO_NAME"])
   end
 
+  task :gen_Jenkinsfile do
+    JenkinsTools.gen_jenkins_file
+  end
+
   desc "create a new project #{job_name}"
   task "#{next_task_index}_create_new_project" do
     xml_file = job_name + ".xml"
     JenkinsTools.gen_job_xml job_name, xml_file, git_repo_url_in_cluster, ENV["JENKINS_GIT_USER_CREDENTIAL_ID"]
-
     JenkinsTools.post_new_job job_name, xml_file, ENV["JENKINS_URL"], ENV["JENKINS_USER"], ENV["JENKINS_USER_API_TOKEN"]
 
     JenkinsTools.gen_jenkins_file
+
+    Builder.create_env job_name
+    Builder.create_rakefile
+    Builder.create_k8_file job_name
+    Builder.create_dockerfile 
   end
 
   desc "delete #{job_name}"
@@ -50,5 +58,36 @@ namespace "Gitlab" do
   desc "delete #{repo_name}"
   task "#{next_task_index}_delete" do
     GitlabTools.delete! repo_name, ENV["GITLAB_BASE_URL"], ENV["GITLAB_API_TOKEN"]
+  end
+end
+
+namespace "git" do
+  @task_index = 0
+
+  repo_name=ENV["REPO_NAME"]
+
+  def git_repo_url
+    sprintf("%s/%s/%s.git",ENV["GITLAB_BASE_URL"], ENV["GITLAB_USER"], ENV["REPO_NAME"])
+  end
+
+  desc "add and commit"
+  task "#{next_task_index}_commit", [:msg] do |t, args|
+    msg = args.msg || "update"
+    sh %Q(git add . && git commit -m "#{msg}")
+  end
+  
+  desc "set remote origin to #{git_repo_url}"
+  task "#{next_task_index}_set_remote_orgin" do
+    sh %Q(git remote add origin #{git_repo_url})
+  end
+
+  desc "reset remote url #{git_repo_url}"
+  task "#{next_task_index}_set_remote_url" do
+    sh %Q(git remote set-url origin #{git_repo_url})
+  end
+
+  desc "push"
+  task "#{next_task_index}_push" do
+    sh %Q(git push -u origin master)
   end
 end

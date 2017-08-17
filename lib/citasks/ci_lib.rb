@@ -1,4 +1,5 @@
 require 'gitlab'
+require 'securerandom'
 
 module JenkinsTools
   WORKFLOW_PLUGIN = ENV["WORKFLOW_PLUGIN"] || "workflow-job@2.14.1"
@@ -80,14 +81,14 @@ module JenkinsTools
       //A Jenkinsfile for start
       podTemplate(label: 'my-pod',
         containers:[
-          // containerTemplate(name: 'compiler', image:'compiler/image',ttyEnabled: true, command: 'cat', envVars:[
-          //     containerEnvVar(key: 'BUILD_NUMBER', value: env.BUILD_NUMBER),
-          //     containerEnvVar(key: 'BUILD_ID', value: env.BUILD_ID),
-          //     containerEnvVar(key: 'BUILD_URL', value: env.BUILD_URL),
-          //     containerEnvVar(key: 'BUILD_TAG', value: env.BUILD_TAG),
-          //     containerEnvVar(key: 'JOB_NAME', value: env.JOB_NAME)
-          //   ],
-          // ),
+          containerTemplate(name: 'compiler', image:'#{ENV["COMPILER_DOCKER_IMAGE"]}',ttyEnabled: true, command: 'cat', envVars:[
+              containerEnvVar(key: 'BUILD_NUMBER', value: env.BUILD_NUMBER),
+              containerEnvVar(key: 'BUILD_ID', value: env.BUILD_ID),
+              containerEnvVar(key: 'BUILD_URL', value: env.BUILD_URL),
+              containerEnvVar(key: 'BUILD_TAG', value: env.BUILD_TAG),
+              containerEnvVar(key: 'JOB_NAME', value: env.JOB_NAME)
+            ],
+          ),
           containerTemplate(name: 'citools', image:'zhiminwen/citools',ttyEnabled: true, command: 'cat', envVars:[
               // these env is only available in container template? podEnvVar deosn't work?!
               containerEnvVar(key: 'BUILD_NUMBER', value: env.BUILD_NUMBER),
@@ -107,20 +108,22 @@ module JenkinsTools
           stage('clone git repo'){
             checkout scm
 
-            // container('compiler'){
-            //  stage('Compile and Build'){
-            //    sh("echo compile")
-            //  }
-            // }
+            container('compiler'){
+             stage('Compile and Build'){
+               sh("echo compile")
+             }
+            }
 
             container('citools'){
               stage('Docker Build'){
                 // sleep 3600
-                sh "echo build docker image" 
+                sh "echo build docker image"
+                // sh "rake -f build.rb docker:01_build_image docker:02_push_to_ICp_registry"  
               }
 
               stage('Deploy into k8s'){
                 sh "echo rollout to k8s" 
+                // sh "rake -f build.rb k8s:01_deploy_to_k8s"
               }
             }
           }
@@ -176,6 +179,190 @@ module GitlabTools
 
   def self.delete! repo_name, gitlab_url, token
     _setup_gitlab gitlab_url, token
-    Gitlab.delete_project repo_name
+
+    project = Gitlab.projects.find do |p|
+      p.name== repo_name
+    end
+    if project.nil?
+      puts "repo #{repo_name} doesn't exists" 
+      return
+    end
+
+    Gitlab.delete_project project.id
+  end
+end
+
+module Builder
+  def self.create_env app_name
+    envs = <<~EOF
+      IMAGE_NAME=#{app_name}
+      
+      PRIVATE_DOCKER_REGISTRY_NAME=master.cfc
+      PRIVATE_DOCKER_REGISTRY_PORT=8500
+      PRIVATE_DOCKER_REGISTRY_IP=#{ENV["ICP_MASTER_IP"]}
+      
+      PRIVATE_DOCKER_REGISTRY_USER=admin
+      PRIVATE_DOCKER_REGISTRY_USER_PASSWORD=admin
+
+    EOF
+
+    File.open ".env.build", "w" do |fh|
+      fh.puts envs
+    end
+  end
+
+  def self.create_rakefile
+    content = <<~OUTEOF
+      require 'sshkit_addon'
+      require 'dotenv'
+      require "yaml"
+
+      Dotenv.load ".env.build"
+
+      @task_index=0
+      def next_task_index
+        @task_index += 1
+        sprintf("%02d", @task_index)
+      end
+
+      image_name = ENV["IMAGE_NAME"]
+      tag=ENV["BUILD_NUMBER"]||"B1"
+
+      namespace "docker" do
+        @task_index=0
+        desc "build docker image"
+        task "\#{next_task_index}_build_image" do
+          sh %Q(env)
+          sh %Q(docker build -t \#{image_name}:\#{tag} .)
+        end
+
+        desc "push to ICp registry"
+        task "\#{next_task_index}_push_to_ICp_registry" do
+          etc_hosts_entry = sprintf("%s %s", ENV["PRIVATE_DOCKER_REGISTRY_IP"], ENV["PRIVATE_DOCKER_REGISTRY_NAME"])
+          private_registry = sprintf("%s:%s", ENV["PRIVATE_DOCKER_REGISTRY_NAME"], ENV["PRIVATE_DOCKER_REGISTRY_PORT"])
+
+          cmds = ShellCommandConstructor.construct_command %Q{
+            echo "\#{etc_hosts_entry}" >> /etc/hosts
+            docker login -u \#{ENV["PRIVATE_DOCKER_REGISTRY_USER"]} -p \#{ENV["PRIVATE_DOCKER_REGISTRY_USER"]} \#{private_registry}
+            
+            docker tag \#{image_name}:\#{tag} \#{private_registry}/default/\#{image_name}:\#{tag}
+            docker push \#{private_registry}/default/\#{image_name}:\#{tag}
+          }
+          sh cmds
+        end
+      end
+
+      namespace "k8s" do
+        @task_index=0
+        desc "deploy into k8s"
+        task "\#{next_task_index}_deploy_to_k8s" do
+          file = "\#{image_name}.k8.template.yaml"
+          docs = YAML.load_stream File.read(file)
+          private_registry = sprintf("%s:%s", ENV["PRIVATE_DOCKER_REGISTRY_NAME"], ENV["PRIVATE_DOCKER_REGISTRY_PORT"])
+          new_image_name = "\#{private_registry}/default/\#{image_name}:\#{tag}"
+
+          File.open yaml_file = "\#{image_name}.yaml", "w" do |fh|
+            docs.each do |doc|
+              if doc["kind"] == "Deployment"
+                doc["spec"]["template"]["spec"]["containers"][0]["image"] = new_image_name
+              end
+              fh.puts doc.to_yaml
+            end
+          end
+
+          deployment = image_name
+          sh %Q(kubectl get deployment | grep \#{deployment} ) do |ok, res|
+            if ok #already exists
+              sh %Q(kubectl apply -f \#{yaml_file})
+              sh %Q(kubectl set image deployment/\#{deployment} \#{image_name}=\#{new_image_name})
+
+              sh %Q(kubectl rollout status deployment/\#{deployment})
+            else
+              puts "no deployment yet. create it"
+              sh %Q(kubectl create -f \#{yaml_file} --record)
+            end
+          end
+
+        end
+      end    
+    OUTEOF
+
+    File.open "build.rb", "w" do |fh|
+      fh.puts content
+    end
+  end
+
+  def self.create_dockerfile
+    File.open "Dockerfile", "w" do |fh|
+      fh.puts <<~EOF
+        FROM bitnami/minideb
+        ADD exe /
+        ENV LISTENING_PORT 80
+        
+        CMD ["/exe"]
+      EOF
+    end
+  end
+
+  def self.create_k8_file app_name
+    content = <<~EOF
+      apiVersion: extensions/v1beta1
+      kind: Deployment
+      metadata:
+        name: #{app_name}
+        labels:
+          app: #{app_name}
+          type: jenkins-build
+      spec:
+        replicas: 2
+        template:
+          metadata:
+            labels:
+              app: #{app_name}
+          spec:
+            containers:
+            - name: #{app_name}
+              #this will be replaced dynamically in the deployment
+              image: #{app_name}:latest
+            imagePullSecrets:
+            - name: admin.registrykey
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: #{app_name}
+        labels:
+          app: #{app_name}
+      spec:
+        type: NodePort
+        ports:
+          - port: 80
+            targetPort: 80
+            protocol: TCP
+            name: http
+        selector:
+          app: #{app_name}
+      ---
+      apiVersion: extensions/v1beta1
+      kind: Ingress
+      metadata:
+        name: #{app_name}-ingress
+        labels:
+          app: #{app_name}-ingress
+      spec:
+        rules:
+          - host: k8s.myvm.io
+            http:
+              paths:
+                - path: /
+                  backend:
+                    serviceName: #{app_name}
+                    servicePort: http
+    EOF
+
+    File.open "#{app_name}.k8.template.yaml", "w" do |fh|
+      fh.puts content
+    end
+    
   end
 end
