@@ -1,6 +1,38 @@
 require_relative "citasks/ci_lib"
 require_relative "citasks/task_index"
 
+namespace "init" do
+  @task_index = 0
+  desc "create initial .env file"
+  task "#{next_task_index}_env" do
+    File.open ".env", "w" do |fh|
+      content = <<~EOF
+        GITLAB_USER = wenzm
+
+        #URL to access out side of k8s cluster
+        GITLAB_BASE_URL = http://localhost:31254
+        GITLAB_IN_CLUSTER_BASE_URL = http://hopping-marsupial-gitlab-ce
+        GITLAB_API_TOKEN = KDbJwWZxXYkKVmGhFSN3
+
+        JENKINS_URL = http://localhost:30003
+        JENKINS_IN_CLUSTER_URL = http://interesting-orangutan-jenkins:8080
+        JENKINS_GIT_USER_CREDENTIAL_ID = gitlab-wenzm-password
+
+        JENKINS_USER = wenzm
+        JENKINS_USER_API_TOKEN = 61631c2cdad1e77fecee45798056eeeb
+
+        JOB_NAME=icp-hybrid-was
+        REPO_NAME=icp-hybrid-was
+
+        COMPILER_DOCKER_IMAGE=maven:3.5-jdk-8
+
+        #for private docker registry
+        ICP_MASTER_IP=192.168.10.100      
+      EOF
+    end
+  end
+end
+
 namespace "Jenkins" do
   @task_index = 0
   job_name = ENV["JOB_NAME"]
@@ -22,6 +54,7 @@ namespace "Jenkins" do
     JenkinsTools.gen_jenkins_file
 
     Builder.create_env job_name
+    Builder.create_lib_files
     Builder.create_rakefile
     Builder.create_k8_file job_name
     Builder.create_dockerfile 

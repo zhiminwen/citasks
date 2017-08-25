@@ -1,0 +1,51 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: icp-traditional-was
+  labels:
+    app: icp-traditional-was
+    type: jenkins-build
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: icp-traditional-was
+    spec:
+      containers:
+      - name: icp-traditional-was
+        image: <%= new_image %>
+      imagePullSecrets:
+      - name: admin.registrykey
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: icp-traditional-was
+  labels:
+    app: icp-traditional-was
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app: icp-traditional-was
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: icp-traditional-was-ingress
+  labels:
+    app: icp-traditional-was-ingress
+spec:
+  rules:
+    - host: k8s.myvm.io
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: icp-traditional-was
+              servicePort: http
