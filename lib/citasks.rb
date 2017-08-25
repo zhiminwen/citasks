@@ -29,6 +29,8 @@ namespace "init" do
         #for private docker registry
         ICP_MASTER_IP=192.168.10.100      
       EOF
+
+      fh.puts content
     end
   end
 end
