@@ -33,6 +33,14 @@ namespace "init" do
 
       fh.puts content
     end
+
+    File.open ".gitignore", "w" do |fh|
+      content =<<~EOF
+        .token
+      EOF
+      
+      fh.puts content
+    end
   end
 end
 

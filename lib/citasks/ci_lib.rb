@@ -8,6 +8,20 @@ def _write fullpath, content
   end
 end
 
+def token_shared_persistently
+  #create a shared token across tasks
+  secret_token_file = ".token"
+  if File.exists? secret_token_file
+    token = File.read secret_token_file
+  else
+    token = SecureRandom.uuid
+    File.open secret_token_file, "w" do |fh|
+      fh.puts token
+    end
+  end
+  token
+end
+
 module JenkinsTools
   WORKFLOW_PLUGIN = ENV["WORKFLOW_PLUGIN"] || "workflow-job@2.14.1"
   GITLAB_PLUGIN = ENV["GITLAB_PLUGIN"] || "gitlab-plugin@1.4.7"
@@ -15,8 +29,10 @@ module JenkinsTools
   GIT_PLUGIN = ENV["GIT_PLUGIN"] || "git@3.4.0"
   
   # git_repo_url = http://virtuous-porcupine-gitlab-ce/wenzm/icp-static-web.git, gitlab-wenzm-password
-  def self.gen_job_xml job_name, xml_file_name, git_repo_url, repo_credential_id_in_jenkins,token_to_trigger_build_remotely = SecureRandom.uuid
-    secret_token = "{AQAAABAAAAAQ76W/e/wjLSZ6yxDaU6oaB3rUABFZ/jw6NVzpJkLGL/8=}" #empty??? TODO
+  def self.gen_job_xml job_name, xml_file_name, git_repo_url, repo_credential_id_in_jenkins, secret_token=nil
+    secret_token = token_shared_persistently if secret_token.nil?
+
+    token_to_trigger_build_remotely = SecureRandom.uuid
     _write xml_file_name, <<~EOF
       <?xml version='1.0' encoding='UTF-8'?>
       <flow-definition plugin="#{WORKFLOW_PLUGIN}">
@@ -45,7 +61,7 @@ module JenkinsTools
                 <includeBranchesSpec></includeBranchesSpec>
                 <excludeBranchesSpec></excludeBranchesSpec>
                 <targetBranchRegex></targetBranchRegex>
-                <!-- <secretToken>#{secret_token}</secretToken> -->
+                <secretToken>#{secret_token}</secretToken>
               </com.dabsquared.gitlabjenkins.GitLabPushTrigger>
             </triggers>
           </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
@@ -163,14 +179,16 @@ module GitlabTools
     Gitlab.create_project repo_name
   end
 
-  def self.setup_hook repo_name, gitlab_url, token, hooked_url, secret_token_for_hooked_url=nil
+  def self.setup_hook repo_name, gitlab_url, token, hooked_url, secret_token=nil
     _setup_gitlab gitlab_url, token
 
     project = Gitlab.projects.find do |p|
       p.name== repo_name
     end
+
+    secret_token = token_shared_persistently if secret_token.nil?
     
-    Gitlab.add_project_hook project.id, hooked_url, :push_events => 1,:enable_ssl_verification=>0, :token=> secret_token_for_hooked_url
+    Gitlab.add_project_hook project.id, hooked_url, :push_events => 1,:enable_ssl_verification=>0, :token=> secret_token
 
   end
 
