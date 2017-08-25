@@ -219,7 +219,7 @@ module Builder
         sprintf("%02d", @task_index)
       end
 
-      def rest_task_index
+      def reset_task_index
         @task_index = 0
       end
     EOF
@@ -323,7 +323,7 @@ module Builder
       tag=ENV["BUILD_NUMBER"]||"B1"
 
       namespace "docker" do
-        rest_task_index
+        reset_task_index
 
         desc "build docker image"
         task "\#{next_task_index}_build_image" do
@@ -333,12 +333,12 @@ module Builder
         desc "push to ICp registry"
         task "\#{next_task_index}_push_to_ICp_registry" do
           DockerTools.add_etc_hosts
-          DockerTools.push_to_registry image_name, tag_name
+          DockerTools.push_to_registry image_name, tag
         end
       end
 
       namespace "k8s" do
-        rest_task_index
+        reset_task_index
 
         desc "deploy into k8s"
         task "\#{next_task_index}_deploy_to_k8s" do

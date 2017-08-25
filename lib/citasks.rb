@@ -4,13 +4,14 @@ require_relative "citasks/task_index"
 namespace "init" do
   @task_index = 0
   desc "create initial .env file"
-  task "#{next_task_index}_env" do
+  task "#{next_task_index}_env", [:project_name] do |t, args|
+    project  =args.project_name
     File.open ".env", "w" do |fh|
       content = <<~EOF
         GITLAB_USER = wenzm
 
         #URL to access out side of k8s cluster
-        GITLAB_BASE_URL = http://localhost:31254
+        GITLAB_BASE_URL = http://localhost:30139
         GITLAB_IN_CLUSTER_BASE_URL = http://hopping-marsupial-gitlab-ce
         GITLAB_API_TOKEN = KDbJwWZxXYkKVmGhFSN3
 
@@ -19,10 +20,10 @@ namespace "init" do
         JENKINS_GIT_USER_CREDENTIAL_ID = gitlab-wenzm-password
 
         JENKINS_USER = wenzm
-        JENKINS_USER_API_TOKEN = 61631c2cdad1e77fecee45798056eeeb
+        JENKINS_USER_API_TOKEN = f432de6a2fbeaaf58757f76194dcd825
 
-        JOB_NAME=icp-hybrid-was
-        REPO_NAME=icp-hybrid-was
+        JOB_NAME=#{project}
+        REPO_NAME=#{project}
 
         COMPILER_DOCKER_IMAGE=maven:3.5-jdk-8
 
