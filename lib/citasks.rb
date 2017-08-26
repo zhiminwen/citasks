@@ -22,6 +22,8 @@ namespace "init" do
         JENKINS_USER = wenzm
         JENKINS_USER_API_TOKEN = f432de6a2fbeaaf58757f76194dcd825
 
+        JENKIN_PROJECT_ENDPOINT_AUTHENTICATION = false
+
         JOB_NAME=#{project}
         REPO_NAME=#{project}
 

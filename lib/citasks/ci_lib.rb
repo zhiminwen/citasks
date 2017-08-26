@@ -30,10 +30,14 @@ module JenkinsTools
   
   # git_repo_url = http://virtuous-porcupine-gitlab-ce/wenzm/icp-static-web.git, gitlab-wenzm-password
   def self.gen_job_xml job_name, xml_file_name, git_repo_url, repo_credential_id_in_jenkins, secret_token=nil
-    secret_token = token_shared_persistently if secret_token.nil?
+    enable_secret_token = ENV["JENKIN_PROJECT_ENDPOINT_AUTHENTICATION"].upcase == "TRUE"
+    
+    if enable_secret_token
+      secret_token = token_shared_persistently if secret_token.nil?
+    end
 
     token_to_trigger_build_remotely = SecureRandom.uuid
-    _write xml_file_name, <<~EOF
+    erb = ERB.new <<~EOF
       <?xml version='1.0' encoding='UTF-8'?>
       <flow-definition plugin="#{WORKFLOW_PLUGIN}">
         <actions/>
@@ -61,7 +65,9 @@ module JenkinsTools
                 <includeBranchesSpec></includeBranchesSpec>
                 <excludeBranchesSpec></excludeBranchesSpec>
                 <targetBranchRegex></targetBranchRegex>
-                <secretToken>#{secret_token}</secretToken>
+                <% if enable_secret_token %>
+                <secretToken><%= secret_token %></secretToken>
+                <% end %>
               </com.dabsquared.gitlabjenkins.GitLabPushTrigger>
             </triggers>
           </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
@@ -92,6 +98,8 @@ module JenkinsTools
         <disabled>false</disabled>
       </flow-definition>
     EOF
+
+    _write xml_file_name, erb.result(binding)
   end
 
   def self.gen_jenkins_file
