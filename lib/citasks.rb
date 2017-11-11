@@ -30,7 +30,9 @@ namespace "init" do
         COMPILER_DOCKER_IMAGE=maven:3.5-jdk-8
 
         #for private docker registry
-        ICP_MASTER_IP=192.168.10.100      
+        ICP_MASTER_IP=192.168.10.100
+        
+        K8S_NAMESPACE=default
       EOF
 
       fh.puts content
@@ -69,7 +71,7 @@ namespace "Jenkins" do
     Builder.create_env job_name
     Builder.create_lib_files
     Builder.create_rakefile
-    Builder.create_k8_file job_name
+    Builder.create_k8_file ENV["K8S_NAMESPACE"] || "default",job_name
     Builder.create_dockerfile 
   end
 

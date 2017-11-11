@@ -220,13 +220,15 @@ module Builder
     _write ".env.build", <<~EOF
       IMAGE_NAME=#{app_name}
       
-      PRIVATE_DOCKER_REGISTRY_NAME=master.cfc
+      PRIVATE_DOCKER_REGISTRY_NAME=mycluster.icp
       PRIVATE_DOCKER_REGISTRY_PORT=8500
       PRIVATE_DOCKER_REGISTRY_IP=#{ENV["ICP_MASTER_IP"]}
-      PRIVATE_DOCKER_REGISTRY_NAMESPACE=default
+      PRIVATE_DOCKER_REGISTRY_NAMESPACE=#{ENV["PRIVATE_DOCKER_REGISTRY_NAMESPACE"]}
       
       PRIVATE_DOCKER_REGISTRY_USER=admin
       PRIVATE_DOCKER_REGISTRY_USER_PASSWORD=admin
+      
+      K8S_NAMESPACE=#{ENV["K8S_NAMESPACE"]}
     EOF
   end
 
@@ -323,16 +325,8 @@ module Builder
           end
         end
 
-        def self.deploy_to_k8s deployment, yaml_file, image_name, new_image_name
-          if Shell.test %Q(kubectl get deployment | grep \#{deployment} )
-            Shell.run %Q(kubectl apply -f \#{yaml_file})
-            Shell.run %Q(kubectl set image deployment/\#{deployment} \#{image_name}=\#{new_image_name})
-
-            Shell.run %Q(kubectl rollout status deployment/\#{deployment})
-          else
-            puts "no deployment yet. create it"
-            Shell.run %Q(kubectl create -f \#{yaml_file} --record)
-          end
+        def self.deploy_to_k8s namespace, deployment, yaml_file, image_name, new_image_name
+          Shell.run %Q(kubectl apply -f \#{yaml_file})
         end
       end
     EOF
@@ -381,7 +375,7 @@ module Builder
           KubeTools.create_new_yaml yaml_template_file, yaml_file, data
 
           deployment = image_name
-          KubeTools.deploy_to_k8s deployment, yaml_file, image_name, full_new_image_name
+          KubeTools.deploy_to_k8s ENV["K8S_NAMESPACE"], deployment, yaml_file, image_name, full_new_image_name
 
         end
       end    
@@ -400,11 +394,12 @@ module Builder
     end
   end
 
-  def self.create_k8_file app_name
+  def self.create_k8_file namespace, app_name
     _write "#{app_name}.k8.template.yaml", <<~EOF
       apiVersion: extensions/v1beta1
       kind: Deployment
       metadata:
+        namespace: #{namespace}
         name: #{app_name}
         labels:
           app: #{app_name}
@@ -425,6 +420,7 @@ module Builder
       apiVersion: v1
       kind: Service
       metadata:
+        namespace: #{namespace}
         name: #{app_name}
         labels:
           app: #{app_name}
@@ -441,6 +437,7 @@ module Builder
       apiVersion: extensions/v1beta1
       kind: Ingress
       metadata:
+        namespace: #{namespace}
         name: #{app_name}-ingress
         labels:
           app: #{app_name}-ingress

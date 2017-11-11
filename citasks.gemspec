@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'citasks'
-  s.version     = '0.1.4'
+  s.version     = '0.1.5'
   s.date        = '2017-08-10'
   s.summary     = "ci/cd tools for gitlab + jenkins"
   s.description = "ci/cd tools for gitlab + jenkins. Libray and rake tasks"
