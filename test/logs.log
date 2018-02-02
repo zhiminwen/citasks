@@ -1,0 +1,21 @@
+RestClient.post "http://192.168.5.100:30072/createItem?name=cicd-demo", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "Content-Type"=>"text/xml", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 500 InternalServerError | text/html 3751 bytes
+RestClient.post "http://192.168.5.100:30072/createItem?name=cicd-demo", 2659 byte(s) length, "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "Content-Length"=>"2659", "Content-Type"=>"text/xml", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 200 OK |  0 bytes
+RestClient.post "http://192.168.5.100:30072/job/cicd-demo/doDelete", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 302 Found |  0 bytes
+RestClient.post "http://192.168.5.100:30072/", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 200 OK | text/html 3986 bytes
+RestClient.post "http://192.168.5.100:30072/createItem?name=cicd-demo", 2649 byte(s) length, "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "Content-Length"=>"2649", "Content-Type"=>"text/xml", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 200 OK |  0 bytes
+RestClient.get "http://mottled-saola-gitlab-ce/wenzm/cicd-demo.git/job/cicd-demo/config.xml", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+RestClient.get "http://192.168.5.100:30072/job/cicd-demo/config.xml", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 200 OK | application/xml 2580 bytes
+RestClient.post "http://192.168.5.100:30072/createItem?name=cicd-demo", 2649 byte(s) length, "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "Content-Length"=>"2649", "Content-Type"=>"text/xml", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 400 BadRequest | text/html 2430 bytes
+RestClient.post "http://192.168.5.100:30072/job/cicd-demo/doDelete", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 302 Found |  0 bytes
+RestClient.post "http://192.168.5.100:30072/", "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 200 OK | text/html 3984 bytes
+RestClient.post "http://192.168.5.100:30072/createItem?name=cicd-demo", 2649 byte(s) length, "Accept"=>"*/*", "Accept-Encoding"=>"gzip, deflate", "Content-Length"=>"2649", "Content-Type"=>"text/xml", "User-Agent"=>"rest-client/2.0.2 (mingw32 x86_64) ruby/2.4.1p111"
+# => 200 OK |  0 bytes

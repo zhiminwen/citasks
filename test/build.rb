@@ -6,7 +6,7 @@ image_name = ENV["IMAGE_NAME"]
 tag=ENV["BUILD_NUMBER"]||"B1"
 
 namespace "docker" do
-  rest_task_index
+  reset_task_index
 
   desc "build docker image"
   task "#{next_task_index}_build_image" do
@@ -16,12 +16,12 @@ namespace "docker" do
   desc "push to ICp registry"
   task "#{next_task_index}_push_to_ICp_registry" do
     DockerTools.add_etc_hosts
-    DockerTools.push_to_registry image_name, tag_name
+    DockerTools.push_to_registry image_name, tag
   end
 end
 
 namespace "k8s" do
-  rest_task_index
+  reset_task_index
 
   desc "deploy into k8s"
   task "#{next_task_index}_deploy_to_k8s" do
@@ -38,7 +38,7 @@ namespace "k8s" do
     KubeTools.create_new_yaml yaml_template_file, yaml_file, data
 
     deployment = image_name
-    KubeTools.deploy_to_k8s deployment, yaml_file, image_name, full_new_image_name
+    KubeTools.deploy_to_k8s ENV["K8S_NAMESPACE"], deployment, yaml_file, image_name, full_new_image_name
 
   end
-end    
+end

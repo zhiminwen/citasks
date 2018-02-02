@@ -1,7 +1,7 @@
 //A Jenkinsfile for start
 podTemplate(label: 'my-pod',
   containers:[
-    containerTemplate(name: 'compiler', image:'maven:3.5-jdk-8',ttyEnabled: true, command: 'cat', envVars:[
+    containerTemplate(name: 'compiler', image:'golang:1.8.3',ttyEnabled: true, command: 'cat', envVars:[
         containerEnvVar(key: 'BUILD_NUMBER', value: env.BUILD_NUMBER),
         containerEnvVar(key: 'BUILD_ID', value: env.BUILD_ID),
         containerEnvVar(key: 'BUILD_URL', value: env.BUILD_URL),
@@ -38,14 +38,14 @@ podTemplate(label: 'my-pod',
         stage('Docker Build'){
           // sleep 3600
           sh "echo build docker image"
-          // sh "rake -f build.rb docker:01_build_image docker:02_push_to_ICp_registry"  
+          // sh "rake -f build.rb docker:01_build_image docker:02_push_to_ICp_registry"
         }
 
         stage('Deploy into k8s'){
-          sh "echo rollout to k8s" 
+          sh "echo rollout to k8s"
           // sh "rake -f build.rb k8s:01_deploy_to_k8s"
         }
       }
     }
   }
-}    
+}

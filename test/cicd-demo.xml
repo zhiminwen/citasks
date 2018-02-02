@@ -1,15 +1,15 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<flow-definition plugin="workflow-job@2.14.1">
+<flow-definition plugin="workflow-job">
   <actions/>
   <description>Workflow Created with template</description>
   <keepDependencies>false</keepDependencies>
   <properties>
-    <com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty plugin="gitlab-plugin@1.4.7">
+    <com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty plugin="gitlab-plugin">
       <gitLabConnection>gitlab</gitLabConnection>
     </com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty>
     <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
       <triggers>
-        <com.dabsquared.gitlabjenkins.GitLabPushTrigger plugin="gitlab-plugin@1.4.7">
+        <com.dabsquared.gitlabjenkins.GitLabPushTrigger plugin="gitlab-plugin">
           <spec></spec>
           <triggerOnPush>true</triggerOnPush>
           <triggerOnMergeRequest>false</triggerOnMergeRequest>
@@ -25,17 +25,17 @@
           <includeBranchesSpec></includeBranchesSpec>
           <excludeBranchesSpec></excludeBranchesSpec>
           <targetBranchRegex></targetBranchRegex>
-          <!-- <secretToken>{AQAAABAAAAAQ76W/e/wjLSZ6yxDaU6oaB3rUABFZ/jw6NVzpJkLGL/8=}</secretToken> -->
+          
         </com.dabsquared.gitlabjenkins.GitLabPushTrigger>
       </triggers>
     </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
   </properties>
-  <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps@2.39">
-    <scm class="hudson.plugins.git.GitSCM" plugin="#[GIT_PLUGIN}">
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps">
+    <scm class="hudson.plugins.git.GitSCM" plugin="git">
       <configVersion>2</configVersion>
       <userRemoteConfigs>
         <hudson.plugins.git.UserRemoteConfig>
-          <url>http://virtuous-porcupine-gitlab-ce/wenzm/icp-traditional-was.git</url>
+          <url>http://mottled-saola-gitlab-ce/wenzm/cicd-demo.git</url>
           <credentialsId>gitlab-wenzm-password</credentialsId>
         </hudson.plugins.git.UserRemoteConfig>
       </userRemoteConfigs>
@@ -52,6 +52,6 @@
     <lightweight>true</lightweight>
   </definition>
   <triggers/>
-  <authToken>274ea22e-f1c8-4082-9682-a47fa514bdc2</authToken>
+  <authToken>983b3261-b655-4574-a28c-deda866dd9e1</authToken>
   <disabled>false</disabled>
 </flow-definition>

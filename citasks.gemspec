@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'citasks'
-  s.version     = '0.1.5'
+  s.version     = '0.1.6'
   s.date        = '2017-08-10'
   s.summary     = "ci/cd tools for gitlab + jenkins"
   s.description = "ci/cd tools for gitlab + jenkins. Libray and rake tasks"
@@ -12,5 +12,5 @@ Gem::Specification.new do |s|
   s.license     = 'MIT'
 
   s.add_dependency 'gitlab', '~> 4.2'
-
+  s.add_dependency 'rest-client', '~> 2.0'
 end

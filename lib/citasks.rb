@@ -22,16 +22,16 @@ namespace "init" do
         JENKINS_USER = wenzm
         JENKINS_USER_API_TOKEN = f432de6a2fbeaaf58757f76194dcd825
 
-        JENKIN_PROJECT_ENDPOINT_AUTHENTICATION = false
-
         JOB_NAME=#{project}
         REPO_NAME=#{project}
 
         COMPILER_DOCKER_IMAGE=maven:3.5-jdk-8
 
         #for private docker registry
+        ICP_REGISTRY_HOSTNAME=dev.icp
         ICP_MASTER_IP=192.168.10.100
-        
+        IMAGE_PULL_SECRET=admin.regkey
+
         K8S_NAMESPACE=default
       EOF
 
@@ -42,7 +42,7 @@ namespace "init" do
       content =<<~EOF
         .token
       EOF
-      
+
       fh.puts content
     end
   end
@@ -60,6 +60,10 @@ namespace "Jenkins" do
     JenkinsTools.gen_jenkins_file
   end
 
+  task "download_job_as_xml" do
+    JenkinsTools.download_job job_name, job_name + ".server.xml", ENV["JENKINS_URL"], ENV["JENKINS_USER"], ENV["JENKINS_USER_API_TOKEN"]
+  end
+
   desc "create a new project #{job_name}"
   task "#{next_task_index}_create_new_project" do
     xml_file = job_name + ".xml"
@@ -72,7 +76,13 @@ namespace "Jenkins" do
     Builder.create_lib_files
     Builder.create_rakefile
     Builder.create_k8_file ENV["K8S_NAMESPACE"] || "default",job_name
-    Builder.create_dockerfile 
+    Builder.create_dockerfile
+  end
+
+  desc "create a new project with existing job xml. No other scaffolding files"
+  task "#{next_task_index}_create_new_project_with_job_xml" do
+    xml_file = job_name + ".xml"
+    JenkinsTools.post_new_job job_name, xml_file, ENV["JENKINS_URL"], ENV["JENKINS_USER"], ENV["JENKINS_USER_API_TOKEN"]
   end
 
   desc "delete #{job_name}"
@@ -123,7 +133,7 @@ namespace "git" do
     msg = args.msg || "update"
     sh %Q(git add . && git commit -m "#{msg}")
   end
-  
+
   desc "set remote origin to #{git_repo_url}"
   task "#{next_task_index}_set_remote_orgin" do
     sh %Q(git remote add origin #{git_repo_url})

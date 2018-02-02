@@ -1,6 +1,8 @@
 require 'gitlab'
 require 'securerandom'
 require "erb"
+require "rest-client"
+require "pp"
 
 def _write fullpath, content
   File.open fullpath, "w" do |fh|
@@ -12,7 +14,7 @@ def token_shared_persistently
   #create a shared token across tasks
   secret_token_file = ".token"
   if File.exists? secret_token_file
-    token = File.read secret_token_file
+    token = File.read(secret_token_file).chomp
   else
     token = SecureRandom.uuid
     File.open secret_token_file, "w" do |fh|
@@ -23,15 +25,16 @@ def token_shared_persistently
 end
 
 module JenkinsTools
-  WORKFLOW_PLUGIN = ENV["WORKFLOW_PLUGIN"] || "workflow-job@2.14.1"
-  GITLAB_PLUGIN = ENV["GITLAB_PLUGIN"] || "gitlab-plugin@1.4.7"
-  WORkFLOW_CPS_PLUGIN = ENV["WORkFLOW_CPS_PLUGIN"] || "workflow-cps@2.39"
-  GIT_PLUGIN = ENV["GIT_PLUGIN"] || "git@3.4.0"
-  
+  WORKFLOW_PLUGIN = ENV["WORKFLOW_PLUGIN"] || "workflow-job"
+  GITLAB_PLUGIN = ENV["GITLAB_PLUGIN"] || "gitlab-plugin"
+  WORkFLOW_CPS_PLUGIN = ENV["WORkFLOW_CPS_PLUGIN"] || "workflow-cps"
+  GIT_PLUGIN = ENV["GIT_PLUGIN"] || "git"
+  # JENKIN_PROJECT_ENDPOINT_AUTHENTICATION = ENV["JENKIN_PROJECT_ENDPOINT_AUTHENTICATION"].to_s.upcase == "TRUE"
+
   # git_repo_url = http://virtuous-porcupine-gitlab-ce/wenzm/icp-static-web.git, gitlab-wenzm-password
   def self.gen_job_xml job_name, xml_file_name, git_repo_url, repo_credential_id_in_jenkins, secret_token=nil
-    enable_secret_token = ENV["JENKIN_PROJECT_ENDPOINT_AUTHENTICATION"].upcase == "TRUE"
-    
+    enable_secret_token = true
+
     if enable_secret_token
       secret_token = token_shared_persistently if secret_token.nil?
     end
@@ -73,7 +76,7 @@ module JenkinsTools
           </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
         </properties>
         <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="#{WORkFLOW_CPS_PLUGIN}">
-          <scm class="hudson.plugins.git.GitSCM" plugin="#[GIT_PLUGIN}">
+          <scm class="hudson.plugins.git.GitSCM" plugin="#{GIT_PLUGIN}">
             <configVersion>2</configVersion>
             <userRemoteConfigs>
               <hudson.plugins.git.UserRemoteConfig>
@@ -131,47 +134,126 @@ module JenkinsTools
         ]
       ){
         node('my-pod') {
-          stage('clone git repo'){
+          stage('check out') {
             checkout scm
+          }
 
+          stage('compile'){
             container('compiler'){
-             stage('Compile and Build'){
-               sh("echo compile")
-             }
-            }
-
-            container('citools'){
-              stage('Docker Build'){
-                // sleep 3600
-                sh "echo build docker image"
-                // sh "rake -f build.rb docker:01_build_image docker:02_push_to_ICp_registry"  
-              }
-
-              stage('Deploy into k8s'){
-                sh "echo rollout to k8s" 
-                // sh "rake -f build.rb k8s:01_deploy_to_k8s"
-              }
+              sh "echo compile"
             }
           }
+
+          stage('Docker Build'){
+            container('citools'){
+              // sleep 3600
+              sh "echo build docker image"
+              // sh "rake -f build.rb docker:01_build_image docker:02_push_to_ICp_registry"
+            }
+          }
+
+          stage('Deploy to ICP'){
+            container('citools'){
+              // sleep 3600
+              echo "deploy to icp..."
+              // sh "rake -f build.rb k8s:01_deploy_to_k8s"
+            }
+          }
+
+          //stage('Deployment'){
+          //  parallel 'deploy to icp': {
+          //    container('citools'){
+          //      echo "deploy to icp..."
+          //      // sh "rake -f build.rb k8s:01_deploy_to_k8s"
+
+          //    }
+          //  },
+
+          //  'deploy to others': {
+          //    container('citools'){
+          //      echo "deploy to others..."
+          //    }
+          //  }
+          //}
         }
-      }    
+      }
     EOF
   end
 
   def self.post_new_job job_name, xml_file, base_url, user, token
-    system %Q(curl -s -XPOST "#{base_url}/createItem?name=#{job_name}" --data-binary "@#{xml_file}" -H "Content-Type:text/xml" --user "#{user}:#{token}")
+    # system %Q(curl -s -XPOST "#{base_url}/createItem?name=#{job_name}" --data-binary "@#{xml_file}" -H "Content-Type:text/xml" --user "#{user}:#{token}")
+    req = RestClient::Request.new(
+      method: :post,
+      user: user,
+      password: token,
+      url: "#{base_url}/createItem?name=#{job_name}",
+      timeout: 30,
+      headers: {
+        "Content-Type" => "text/xml",
+      },
+      payload: File.read(xml_file)
+    )
+
+    begin
+      res = req.execute
+    rescue RestClient::ExceptionWithResponse => err
+      case err.http_code
+      when 301, 302, 307
+        err.response.follow_redirection
+      else
+        raise
+      end
+    end
+
   end
 
   def self.download_job job_name, xml_file, base_url, user, token
-    system %Q(curl -s "#{base_url}/job/#{job_name}/config.xml" -o #{xml_file} --user "#{user}:#{token}")
+    # system %Q(curl -s "#{base_url}/job/#{job_name}/config.xml" -o #{xml_file} --user "#{user}:#{token}")
+    req = RestClient::Request.new(
+      method: :get,
+      user: user,
+      password: token,
+      url: "#{base_url}/job/#{job_name}/config.xml",
+      timeout: 30
+    )
+
+    res = req.execute
+
+    File.open xml_file, "w" do |fh|
+      fh.puts res.body
+    end
   end
 
   def self.delete! job_name, base_url, user, token
-    system %Q(curl -XPOST "#{base_url}/job/#{job_name}/doDelete" --user "#{user}:#{token}")
+    # system %Q(curl -XPOST "#{base_url}/job/#{job_name}/doDelete" --user "#{user}:#{token}")
+    req = RestClient::Request.new(
+      method: :post,
+      user: user,
+      password: token,
+      url: "#{base_url}/job/#{job_name}/doDelete",
+      timeout: 30
+    )
+
+    begin
+      res = req.execute
+    rescue RestClient::ExceptionWithResponse => err
+      case err.http_code
+      when 301, 302, 307
+        err.response.follow_redirection
+      else
+        raise
+      end
+    end
   end
 
   def self.trigger_build job_name,build_token, base_url
-    system %Q(curl "#{base_url}/job/#{job_name}/build?token=#{build_token}")
+    # system %Q(curl "#{base_url}/job/#{job_name}/build?token=#{build_token}")
+    req = RestClient::Request.new(
+      method: :get,
+      url: "#{base_url}/job/#{job_name}/build?token=#{build_token}",
+      timeout: 30
+    )
+    res = req.execute
   end
 
 end
@@ -195,7 +277,7 @@ module GitlabTools
     end
 
     secret_token = token_shared_persistently if secret_token.nil?
-    
+
     Gitlab.add_project_hook project.id, hooked_url, :push_events => 1,:enable_ssl_verification=>0, :token=> secret_token
 
   end
@@ -207,7 +289,7 @@ module GitlabTools
       p.name== repo_name
     end
     if project.nil?
-      puts "repo #{repo_name} doesn't exists" 
+      puts "repo #{repo_name} doesn't exists"
       return
     end
 
@@ -219,15 +301,17 @@ module Builder
   def self.create_env app_name
     _write ".env.build", <<~EOF
       IMAGE_NAME=#{app_name}
-      
-      PRIVATE_DOCKER_REGISTRY_NAME=mycluster.icp
+
+      PRIVATE_DOCKER_REGISTRY_NAME=#{ENV["ICP_REGISTRY_HOSTNAME"]}
       PRIVATE_DOCKER_REGISTRY_PORT=8500
       PRIVATE_DOCKER_REGISTRY_IP=#{ENV["ICP_MASTER_IP"]}
       PRIVATE_DOCKER_REGISTRY_NAMESPACE=#{ENV["PRIVATE_DOCKER_REGISTRY_NAMESPACE"]}
-      
+
       PRIVATE_DOCKER_REGISTRY_USER=admin
       PRIVATE_DOCKER_REGISTRY_USER_PASSWORD=admin
-      
+
+      PRIVATE_DOCKER_REGISTRY_PULL_SECRET=#{ENV["IMAGE_PULL_SECRET"]}
+
       K8S_NAMESPACE=#{ENV["K8S_NAMESPACE"]}
     EOF
   end
@@ -240,7 +324,7 @@ module Builder
 
       require_relative "docker.rb"
       require_relative "k8s.rb"
-      
+
       @task_index=0
       def next_task_index
         @task_index += 1
@@ -291,14 +375,14 @@ module Builder
           etc_hosts_entry = sprintf("%s %s", ENV["PRIVATE_DOCKER_REGISTRY_IP"], ENV["PRIVATE_DOCKER_REGISTRY_NAME"])
           Shell.run %Q(echo "\#{etc_hosts_entry}" >> /etc/hosts)
         end
-        
+
         def self.push_to_registry image_name, tag
           private_registry = sprintf("%s:%s", ENV["PRIVATE_DOCKER_REGISTRY_NAME"], ENV["PRIVATE_DOCKER_REGISTRY_PORT"])
           namespace = ENV["PRIVATE_DOCKER_REGISTRY_NAMESPACE"]
 
           cmds = ShellCommandConstructor.construct_command %Q{
             docker login -u \#{ENV["PRIVATE_DOCKER_REGISTRY_USER"]} -p \#{ENV["PRIVATE_DOCKER_REGISTRY_USER_PASSWORD"]} \#{private_registry}
-            
+
             docker tag \#{image_name}:\#{tag} \#{private_registry}/\#{namespace}/\#{image_name}:\#{tag}
             docker push \#{private_registry}/\#{namespace}/\#{image_name}:\#{tag}
           }
@@ -306,31 +390,41 @@ module Builder
         end
       end
     EOF
-    
+
     _write lib_dir + '/k8s.rb', <<~EOF
       require "erb"
       require_relative "shell"
 
       module KubeTools
+        def self.create_namespace namespace
+          Shell.run %Q(kubectl create namespace \#{namespace} || echo ignore exists error)
+        end
+
+        def self.create_pull_secret namespace, user, pass, secret_name
+          Shell.run %Q(kubectl delete secret \#{secret_name} -n \#{namespace} || echo ignore non exists error)
+          Shell.run %Q(kubectl create secret docker-registry \#{secret_name} -n \#{namespace} --docker-server=\#{ENV["PRIVATE_DOCKER_REGISTRY_NAME"]}:\#{ENV["PRIVATE_DOCKER_REGISTRY_PORT"]} --docker-username=\#{ENV["PRIVATE_DOCKER_REGISTRY_USER"]} --docker-password=\#{ENV["PRIVATE_DOCKER_REGISTRY_USER_PASSWORD"]} --docker-email=\#{ENV["PRIVATE_DOCKER_REGISTRY_USER"]}@\#{ENV["PRIVATE_DOCKER_REGISTRY_NAME"]})
+        end
+
+
         def self.create_new_yaml yaml_template_file, yaml_file, data = {}
           erb = ERB.new(File.read(yaml_template_file))
           b = binding
-          
+
           data.each_pair do |key, value|
             b.local_variable_set(key, value)
           end
-  
+
           File.open yaml_file, "w" do |fh|
             fh.puts erb.result(b)
           end
         end
 
-        def self.deploy_to_k8s namespace, deployment, yaml_file, image_name, new_image_name
+        def self.deploy_to_k8s yaml_file
           Shell.run %Q(kubectl apply -f \#{yaml_file})
         end
       end
     EOF
-    
+
   end
 
   def self.create_rakefile
@@ -353,6 +447,7 @@ module Builder
         desc "push to ICp registry"
         task "\#{next_task_index}_push_to_ICp_registry" do
           DockerTools.add_etc_hosts
+          KubeTools.create_namespace ENV["K8S_NAMESPACE"]
           DockerTools.push_to_registry image_name, tag
         end
       end
@@ -362,11 +457,14 @@ module Builder
 
         desc "deploy into k8s"
         task "\#{next_task_index}_deploy_to_k8s" do
+          KubeTools.create_pull_secret ENV["K8S_NAMESPACE"], ENV["PRIVATE_DOCKER_REGISTRY_USER"], ENV["PRIVATE_DOCKER_REGISTRY_USER_PASSWORD"], ENV["PRIVATE_DOCKER_REGISTRY_PULL_SECRET"]
+
           yaml_template_file = "\#{image_name}.k8.template.yaml"
           yaml_file = "\#{image_name}.yaml"
 
           private_registry = sprintf("%s:%s", ENV["PRIVATE_DOCKER_REGISTRY_NAME"], ENV["PRIVATE_DOCKER_REGISTRY_PORT"])
           namespace = ENV["PRIVATE_DOCKER_REGISTRY_NAMESPACE"]
+
           full_new_image_name = "\#{private_registry}/\#{namespace}/\#{image_name}:\#{tag}"
           data = {
             new_image: full_new_image_name
@@ -374,11 +472,9 @@ module Builder
 
           KubeTools.create_new_yaml yaml_template_file, yaml_file, data
 
-          deployment = image_name
-          KubeTools.deploy_to_k8s ENV["K8S_NAMESPACE"], deployment, yaml_file, image_name, full_new_image_name
-
+          KubeTools.deploy_to_k8s yaml_file
         end
-      end    
+      end
     OUTEOF
   end
 
@@ -388,13 +484,13 @@ module Builder
         FROM bitnami/minideb
         ADD exe /
         ENV LISTENING_PORT 80
-        
+
         CMD ["/exe"]
       EOF
     end
   end
 
-  def self.create_k8_file namespace, app_name
+  def self.create_k8_file namespace, app_name, pull_secret=ENV["IMAGE_PULL_SECRET"]
     _write "#{app_name}.k8.template.yaml", <<~EOF
       apiVersion: extensions/v1beta1
       kind: Deployment
@@ -415,7 +511,7 @@ module Builder
             - name: #{app_name}
               image: <%= new_image %>
             imagePullSecrets:
-            - name: admin.registrykey
+            - name: #{pull_secret}
       ---
       apiVersion: v1
       kind: Service

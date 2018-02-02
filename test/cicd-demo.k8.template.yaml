@@ -1,19 +1,20 @@
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: icp-traditional-was
+  namespace: default
+  name: cicd-demo
   labels:
-    app: icp-traditional-was
+    app: cicd-demo
     type: jenkins-build
 spec:
   replicas: 2
   template:
     metadata:
       labels:
-        app: icp-traditional-was
+        app: cicd-demo
     spec:
       containers:
-      - name: icp-traditional-was
+      - name: cicd-demo
         image: <%= new_image %>
       imagePullSecrets:
       - name: admin.registrykey
@@ -21,9 +22,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: icp-traditional-was
+  namespace: default
+  name: cicd-demo
   labels:
-    app: icp-traditional-was
+    app: cicd-demo
 spec:
   type: NodePort
   ports:
@@ -32,14 +34,15 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: icp-traditional-was
+    app: cicd-demo
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
-  name: icp-traditional-was-ingress
+  namespace: default
+  name: cicd-demo-ingress
   labels:
-    app: icp-traditional-was-ingress
+    app: cicd-demo-ingress
 spec:
   rules:
     - host: k8s.myvm.io
@@ -47,5 +50,5 @@ spec:
         paths:
           - path: /
             backend:
-              serviceName: icp-traditional-was
+              serviceName: cicd-demo
               servicePort: http

@@ -9,6 +9,6 @@ def next_task_index
   sprintf("%02d", @task_index)
 end
 
-def rest_task_index
+def reset_task_index
   @task_index = 0
 end
